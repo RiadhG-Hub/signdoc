@@ -13,7 +13,14 @@ import 'helper/signature_utils.dart';
 
 class SignDocumentPage extends StatefulWidget {
   final String? initialPdfUrl;
-  const SignDocumentPage({super.key, this.initialPdfUrl});
+  final ValueChanged<Exception>? onError;
+  final ValueChanged<File>? onSignedDocument;
+  const SignDocumentPage({
+    super.key,
+    this.initialPdfUrl,
+    this.onError,
+    this.onSignedDocument,
+  });
 
   @override
   State<SignDocumentPage> createState() => _SignDocumentState();
@@ -39,6 +46,8 @@ class _SignDocumentState extends State<SignDocumentPage> {
 
   bool _isPinchingSignature = false;
   double? _pinchInitialScale;
+
+  int? _pageToRestore;
 
   @override
   void initState() {
@@ -92,13 +101,20 @@ class _SignDocumentState extends State<SignDocumentPage> {
           _pdfPath = path;
           _pdfKey = UniqueKey();
         });
+      } else {
+        widget.onError?.call(Exception('Failed to load PDF: No valid path'));
       }
     } catch (e) {
       debugPrint('Error loading PDF: $e');
+      widget.onError?.call(
+        e is Exception ? e : Exception('Failed to load PDF: $e'),
+      );
     }
   }
 
   Future<void> _showPopupAndLoadSignature() async {
+    // Remember current page to restore after dialog closes
+    _pageToRestore = _currentPage;
     if (mounted) {
       setState(() {
         _pdfVisible = false;
@@ -124,6 +140,18 @@ class _SignDocumentState extends State<SignDocumentPage> {
         _pdfKey = UniqueKey();
       });
     }
+    // After making it visible, attempt to restore page soon after build
+    if (_pageToRestore != null) {
+      // give a short delay to ensure controller gets attached
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final controller = _pdfController;
+      final target = _pageToRestore;
+      if (controller != null && target != null) {
+        try {
+          await controller.setPage(target);
+        } catch (_) {}
+      }
+    }
 
     if (result != null && result['image'] is ui.Image) {
       try {
@@ -141,15 +169,25 @@ class _SignDocumentState extends State<SignDocumentPage> {
         for (final p in _placements.where((p) => p.page == _currentPage)) {
           _centerPlacement(p);
         }
-        if (mounted) setState(() {});
+        await Future<void>.delayed(const Duration(seconds: 1));
+
+        await _pdfController?.setPage(_currentPage);
+
+        setState(() {});
       } catch (e, s) {
         debugPrint('Error loading signature: $e\n$s');
+        widget.onError?.call(
+          e is Exception ? e : Exception('Failed to load signature: $e'),
+        );
       }
     }
   }
 
   Future<void> _savePdfWithSignatures() async {
     if (_pdfPath == null || _signaturePng == null || _signatureImage == null) {
+      widget.onError?.call(
+        Exception('Cannot save: Missing PDF or signature data'),
+      );
       return;
     }
     try {
@@ -197,7 +235,11 @@ class _SignDocumentState extends State<SignDocumentPage> {
       final List<int> signedBytes = await document.save();
       document.dispose();
 
-      // Simulate upload process locally (no Bloc)
+      // Save the signed PDF to a file
+      final signedFile = File('${_pdfPath!}_signed.pdf');
+      await signedFile.writeAsBytes(signedBytes);
+
+      // Simulate upload process locally
       _showLoadingDialog();
       try {
         await Future<void>.delayed(const Duration(seconds: 2));
@@ -206,6 +248,8 @@ class _SignDocumentState extends State<SignDocumentPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Upload successful')));
+        // Call onSignedDocument with the signed file
+        widget.onSignedDocument?.call(signedFile);
         setState(() {
           _signatureImage = null;
           _signaturePng = null;
@@ -213,6 +257,8 @@ class _SignDocumentState extends State<SignDocumentPage> {
         });
       } catch (e) {
         _hideLoadingDialogIfAny();
+        final error = Exception('Upload failed: $e');
+        widget.onError?.call(error);
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -221,6 +267,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
       }
     } catch (e, s) {
       debugPrint('Error saving PDF: $e\n$s');
+      widget.onError?.call(
+        e is Exception ? e : Exception('Failed to save PDF: $e'),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -359,13 +408,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
               icon: const Icon(Icons.add_circle_outline),
               onPressed: _addPlacementForCurrentPage,
             ),
-          if (_signatureImage != null)
-            IconButton(
-              key: const Key('removeSignatureIconButton'),
-              tooltip: 'Remove signature',
-              icon: const Icon(Icons.remove_circle_outline),
-              onPressed: _removePlacementForCurrentPage,
-            ),
         ],
         centerTitle: true,
       ),
@@ -419,31 +461,69 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                                 pageFling: false,
                                                 backgroundColor: Colors.grey,
                                                 fitPolicy: FitPolicy.WIDTH,
-                                                onViewCreated: (controller) {
+                                                onViewCreated: (
+                                                  controller,
+                                                ) async {
                                                   setState(() {
                                                     _pdfController = controller;
                                                   });
+                                                  // Try restoring page after controller is ready
+                                                  final target = _pageToRestore;
+                                                  if (target != null) {
+                                                    try {
+                                                      await controller.setPage(
+                                                        target,
+                                                      );
+                                                    } catch (_) {}
+                                                  }
                                                 },
-                                                onRender: (pages) {
+                                                onRender: (pages) async {
                                                   setState(() {
                                                     _pageCount = pages ?? 0;
                                                   });
+                                                  // Also try restoring here in case not yet done
+                                                  final controller =
+                                                      _pdfController;
+                                                  final target = _pageToRestore;
+                                                  if (controller != null &&
+                                                      target != null) {
+                                                    try {
+                                                      await controller.setPage(
+                                                        target,
+                                                      );
+                                                    } catch (_) {}
+                                                  }
                                                 },
                                                 onPageChanged: (page, total) {
+                                                  // Once we receive a change to our intended page, clear restore flag
+                                                  if (_pageToRestore != null &&
+                                                      page == _pageToRestore) {
+                                                    _pageToRestore = null;
+                                                  }
                                                   setState(() {
                                                     _currentPage = page ?? 0;
                                                     _pageCount =
                                                         total ?? _pageCount;
                                                   });
                                                 },
-                                                onError:
-                                                    (error) => debugPrint(
-                                                      error.toString(),
+                                                onError: (error) {
+                                                  debugPrint(error.toString());
+                                                  widget.onError?.call(
+                                                    Exception(
+                                                      'PDFView error: $error',
                                                     ),
-                                                onPageError:
-                                                    (page, error) => debugPrint(
-                                                      '$page: ${error.toString()}',
+                                                  );
+                                                },
+                                                onPageError: (page, error) {
+                                                  debugPrint(
+                                                    '$page: ${error.toString()}',
+                                                  );
+                                                  widget.onError?.call(
+                                                    Exception(
+                                                      'PDFView page $page error: $error',
                                                     ),
+                                                  );
+                                                },
                                               )
                                               : const SizedBox.shrink(),
                                     ),
@@ -542,18 +622,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                             });
                                           },
                                           onDoubleTap: () {
-                                            if (_placements.length <= 1) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'At least one signature must remain',
-                                                  ),
-                                                ),
-                                              );
-                                              return;
-                                            }
                                             setState(() {
                                               final currentIndex = _placements
                                                   .indexOf(placement);
@@ -659,15 +727,33 @@ class _SignDocumentState extends State<SignDocumentPage> {
   }
 }
 
-class SignDocWrapper extends StatelessWidget {
+class SignDocWrapper extends StatelessWidget with SignatureResult {
   const SignDocWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: SignDocumentPage(
-        initialPdfUrl: "https://helpx.adobe.com/pdf/acrobat_reference.pdf",
+        initialPdfUrl:
+            "https://adaptsolutions.com/content/uploads/2019/01/link-user-manual.pdf",
+        onError: onSignatureFailed,
+        onSignedDocument: onSignatureSucceed,
       ),
     );
   }
+
+  @override
+  void onSignatureSucceed(File file) {
+    debugPrint('Signed document saved: ${file.path}');
+  }
+
+  @override
+  void onSignatureFailed(Exception message) {
+    debugPrint('Signature failed: $message');
+  }
+}
+
+mixin SignatureResult {
+  void onSignatureSucceed(File file);
+  void onSignatureFailed(Exception message);
 }
