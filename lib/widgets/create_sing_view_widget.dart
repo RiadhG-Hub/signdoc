@@ -1,14 +1,10 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:syncfusion_flutter_signaturepad/signaturepad.dart';
 
-import '../bloc/sign_document_bloc.dart';
-
 class CreateSingViewWidget extends StatefulWidget {
-  final SignDocumentBloc signatureBloc;
-  const CreateSingViewWidget({super.key, required this.signatureBloc});
+  const CreateSingViewWidget({super.key});
 
   @override
   State<CreateSingViewWidget> createState() => _CreateSingViewWidgetState();
@@ -16,6 +12,9 @@ class CreateSingViewWidget extends StatefulWidget {
 
 class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
   int signatureCount = 1;
+  final GlobalKey<SfSignaturePadState> _signatureKey =
+      GlobalKey<SfSignaturePadState>();
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -54,7 +53,7 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: SfSignaturePad(
-                  key: widget.signatureBloc.getSignaturePadKey,
+                  key: _signatureKey,
                   minimumStrokeWidth: 1,
                   maximumStrokeWidth: 3,
                   strokeColor: Colors.black,
@@ -72,18 +71,14 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                     child: Text("save"),
                     onPressed: () async {
                       try {
-                        final signaturePadKey =
-                            widget.signatureBloc.getSignaturePadKey;
+                        final signaturePadKey = _signatureKey;
                         ui.Image image =
                             await signaturePadKey.currentState!.toImage();
-                        if (context.mounted) {
-                          widget.signatureBloc.setSignatureImage = image;
-                          widget.signatureBloc.setSignatureCount =
-                              signatureCount;
-                        }
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                        }
+                        if (!context.mounted) return;
+                        Navigator.pop(context, {
+                          'image': image,
+                          'count': signatureCount,
+                        });
                       } catch (e, s) {
                         print("error: $e, stack: $s");
                       }
@@ -95,7 +90,6 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                 Flexible(
                   child: OutlinedButton(
                     onPressed: () {
-                      widget.signatureBloc.clearSignature();
                       Navigator.pop(context);
                     },
                     style: OutlinedButton.styleFrom(
@@ -123,11 +117,7 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                 Flexible(
                   child: OutlinedButton(
                     onPressed: () async {
-                      context
-                          .read<SignDocumentBloc>()
-                          .getSignaturePadKey
-                          .currentState!
-                          .clear();
+                      _signatureKey.currentState?.clear();
                     },
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
