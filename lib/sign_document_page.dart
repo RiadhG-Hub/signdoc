@@ -112,13 +112,16 @@ class _SignDocumentState extends State<SignDocumentPage> {
       } catch (_) {}
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
+    final bloc = context.read<SignDocumentBloc>();
 
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder:
-          (context) =>
-              CreateSingViewWidget(key: const Key('createSignatureDialog')),
+          (context) => CreateSingViewWidget(
+            key: const Key('createSignatureDialog'),
+            signatureBloc: bloc,
+          ),
     );
 
     if (mounted) {
@@ -128,7 +131,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
       });
     }
 
-    final bloc = context.read<SignDocumentBloc>();
     if (bloc.signatureImage != null) {
       try {
         _signatureImage = bloc.signatureImage;
@@ -698,7 +700,9 @@ class SignDocWrapper extends StatelessWidget {
             create: (BuildContext context) => SignDocumentBloc(),
           ),
         ],
-        child: SignDocumentPage(),
+        child: SignDocumentPage(
+          initialPdfUrl: "https://helpx.adobe.com/pdf/acrobat_reference.pdf",
+        ),
       ),
     );
   }
