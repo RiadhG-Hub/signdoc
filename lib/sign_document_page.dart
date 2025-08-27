@@ -12,12 +12,12 @@ import 'helper/pdf_downloader.dart';
 import 'helper/signature_utils.dart';
 
 class SignDocumentPage extends StatefulWidget {
-  final String? initialPdfUrl;
+  final File file;
   final ValueChanged<Exception>? onError;
   final ValueChanged<File>? onSignedDocument;
   const SignDocumentPage({
     super.key,
-    this.initialPdfUrl,
+    required this.file,
     this.onError,
     this.onSignedDocument,
   });
@@ -89,16 +89,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
 
   Future<void> _loadInitialPdf() async {
     try {
-      String? path;
-      if (widget.initialPdfUrl != null && widget.initialPdfUrl!.isNotEmpty) {
-        path = await _pdfDownloader.ensurePdfFromUrl(widget.initialPdfUrl!);
-        path ??= await _pdfDownloader.downloadFromUrl(widget.initialPdfUrl!);
-      } else {
-        path = await _pdfDownloader.downloadExample();
-      }
-      if (path != null && mounted) {
+      if (mounted) {
         setState(() {
-          _pdfPath = path;
+          _pdfPath = widget.file.path;
           _pdfKey = UniqueKey();
         });
       } else {
@@ -727,30 +720,14 @@ class _SignDocumentState extends State<SignDocumentPage> {
   }
 }
 
-class SignDocWrapper extends StatelessWidget with SignatureResult {
-  const SignDocWrapper({super.key});
+@override
+void onSignatureSucceed(File file) {
+  debugPrint('Signed document saved: ${file.path}');
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: SignDocumentPage(
-        initialPdfUrl:
-            "https://adaptsolutions.com/content/uploads/2019/01/link-user-manual.pdf",
-        onError: onSignatureFailed,
-        onSignedDocument: onSignatureSucceed,
-      ),
-    );
-  }
-
-  @override
-  void onSignatureSucceed(File file) {
-    debugPrint('Signed document saved: ${file.path}');
-  }
-
-  @override
-  void onSignatureFailed(Exception message) {
-    debugPrint('Signature failed: $message');
-  }
+@override
+void onSignatureFailed(Exception message) {
+  debugPrint('Signature failed: $message');
 }
 
 mixin SignatureResult {
