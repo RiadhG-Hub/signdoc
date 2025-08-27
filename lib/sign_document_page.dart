@@ -685,3 +685,21 @@ class _SignDocumentState extends State<SignDocumentPage> {
     );
   }
 }
+
+class SignDocWrapper extends StatelessWidget {
+  const SignDocWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider<SignDocumentBloc>(
+            create: (BuildContext context) => SignDocumentBloc(),
+          ),
+        ],
+        child: SignDocumentPage(),
+      ),
+    );
+  }
+}
