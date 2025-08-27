@@ -1,5 +1,1 @@
-/// A Calculator.
-class Calculator {
-  /// Returns [value] plus 1.
-  int addOne(int value) => value + 1;
-}
+export 'package:signdoc/sign_document_page.dart';
