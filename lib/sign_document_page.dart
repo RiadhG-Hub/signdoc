@@ -15,11 +15,13 @@ class SignDocumentPage extends StatefulWidget {
   final File file;
   final ValueChanged<Exception>? onError;
   final ValueChanged<File>? onSignedDocument;
+  final ValueChanged<String>? onCancelled;
   const SignDocumentPage({
     super.key,
     required this.file,
     this.onError,
     this.onSignedDocument,
+    this.onCancelled,
   });
 
   @override
@@ -73,10 +75,13 @@ class _SignDocumentState extends State<SignDocumentPage> {
     });
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _loadInitialPdf();
       try {
+        await _loadInitialPdf();
+        await _showPopupAndLoadSignature();
         await WidgetsBinding.instance.endOfFrame;
-      } catch (_) {}
+      } catch (e, s) {
+        debugPrint('End of frame error: $e\n$s');
+      }
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       if (!mounted) return;
@@ -123,8 +128,10 @@ class _SignDocumentState extends State<SignDocumentPage> {
       context: context,
       barrierDismissible: false,
       builder:
-          (context) =>
-              const CreateSingViewWidget(key: Key('createSignatureDialog')),
+          (context) => CreateSingViewWidget(
+            key: Key('createSignatureDialog'),
+            onCancelled: widget.onCancelled,
+          ),
     );
 
     if (mounted) {
@@ -390,7 +397,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
         title: const Text('Sign Document', key: Key('signDocumentTitle')),
         leading: IconButton(
           key: const Key('backButton'),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            widget.onCancelled?.call("back button pressed");
+          },
           icon: const Icon(Icons.arrow_back),
         ),
         actions: [
@@ -701,21 +710,24 @@ class _SignDocumentState extends State<SignDocumentPage> {
         },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: Padding(
-        key: const Key('bottomButtonPadding'),
-        padding: const EdgeInsets.only(right: 12, left: 12, bottom: 60),
-        child: MaterialButton(
-          key: const Key('signatureSaveButton'),
-          onPressed: () async {
-            if (!hasSignature) {
-              await _showPopupAndLoadSignature();
-            } else {
-              await _savePdfWithSignatures();
-            }
-          },
-          child: Text(hasSignature ? 'Upload PDF' : 'Add Signature'),
-        ),
-      ),
+      bottomNavigationBar:
+          hasSignature
+              ? Padding(
+                key: const Key('bottomButtonPadding'),
+                padding: const EdgeInsets.only(right: 12, left: 12, bottom: 60),
+                child: MaterialButton(
+                  key: const Key('signatureSaveButton'),
+                  onPressed: () async {
+                    if (!hasSignature) {
+                      await _showPopupAndLoadSignature();
+                    } else {
+                      await _savePdfWithSignatures();
+                    }
+                  },
+                  child: Text(hasSignature ? 'Upload PDF' : 'Add Signature'),
+                ),
+              )
+              : SizedBox(height: 60),
     );
   }
 }
@@ -733,4 +745,5 @@ void onSignatureFailed(Exception message) {
 mixin SignatureResult {
   void onSignatureSucceed(File file);
   void onSignatureFailed(Exception message);
+  void onSignatureCancelled(String message);
 }

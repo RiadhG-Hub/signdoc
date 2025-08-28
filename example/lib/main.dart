@@ -59,6 +59,7 @@ class _SignDocWrapperState extends State<SignDocWrapper> with SignatureResult {
       file: _selectedFile!,
       onError: onSignatureFailed,
       onSignedDocument: onSignatureSucceed,
+      onCancelled: onSignatureCancelled,
     );
   }
 
@@ -79,5 +80,15 @@ class _SignDocWrapperState extends State<SignDocWrapper> with SignatureResult {
 
     // Open the signed file immediately
     await OpenFilex.open(file.path);
+    _selectedFile = null;
+    setState(() {});
+  }
+
+  @override
+  void onSignatureCancelled(String message) {
+    print(message);
+    setState(() {
+      _selectedFile = null;
+    });
   }
 }
