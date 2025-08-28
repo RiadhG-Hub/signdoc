@@ -14,18 +14,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(home: SignDocWrapper());
+    return const MaterialApp(home: DocumentSigner());
   }
 }
 
-class SignDocWrapper extends StatefulWidget {
-  const SignDocWrapper({super.key});
+class DocumentSigner extends StatefulWidget {
+  const DocumentSigner({super.key});
 
   @override
-  State<SignDocWrapper> createState() => _SignDocWrapperState();
+  State<DocumentSigner> createState() => _DocumentSignerState();
 }
 
-class _SignDocWrapperState extends State<SignDocWrapper> with SignatureResult {
+class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
   File? _selectedFile;
 
   Future<void> _pickFile() async {
@@ -60,6 +60,7 @@ class _SignDocWrapperState extends State<SignDocWrapper> with SignatureResult {
       onError: onSignatureFailed,
       onSignedDocument: onSignatureSucceed,
       onCancelled: onSignatureCancelled,
+      uploadButtonMessage: "Save pdf",
     );
   }
 
@@ -86,7 +87,7 @@ class _SignDocWrapperState extends State<SignDocWrapper> with SignatureResult {
 
   @override
   void onSignatureCancelled(String message) {
-    print(message);
+    debugPrint(message);
     setState(() {
       _selectedFile = null;
     });

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_signaturepad/signaturepad.dart';
 
 class CreateSingViewWidget extends StatefulWidget {
-  const CreateSingViewWidget({super.key});
+  final ValueChanged<String>? onCancelled;
+
+  const CreateSingViewWidget({super.key, this.onCancelled});
 
   @override
   State<CreateSingViewWidget> createState() => _CreateSingViewWidgetState();
@@ -90,6 +92,7 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                 Flexible(
                   child: OutlinedButton(
                     onPressed: () {
+                      widget.onCancelled?.call("cancel signature");
                       Navigator.pop(context);
                     },
                     style: OutlinedButton.styleFrom(

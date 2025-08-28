@@ -8,7 +8,6 @@ import 'package:signdoc/widgets/create_sing_view_widget.dart';
 import 'package:signdoc/widgets/signature_overlay_widget.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
-import 'helper/pdf_downloader.dart';
 import 'helper/signature_utils.dart';
 
 class SignDocumentPage extends StatefulWidget {
@@ -16,12 +15,21 @@ class SignDocumentPage extends StatefulWidget {
   final ValueChanged<Exception>? onError;
   final ValueChanged<File>? onSignedDocument;
   final ValueChanged<String>? onCancelled;
+  final String uploadButtonMessage; // Upload button message
+  final String nextButtonMessage; // Next button message
+  final String prevButtonMessage; // Previous button message
+  final String addSignatureMessage; // Add signature button message
+
   const SignDocumentPage({
     super.key,
     required this.file,
     this.onError,
     this.onSignedDocument,
     this.onCancelled,
+    this.uploadButtonMessage = 'Upload PDF', // Default value
+    this.nextButtonMessage = 'Next', // Default value
+    this.prevButtonMessage = 'Previous', // Default value
+    this.addSignatureMessage = 'Add Signature', // Default value
   });
 
   @override
@@ -38,7 +46,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
   Uint8List? _signaturePng;
   final List<SignaturePlacement> _placements = [];
   final SignatureUtils _sigUtils = const SignatureUtils();
-  final PdfDownloader _pdfDownloader = const PdfDownloader();
   Size _pdfViewSize = Size.zero;
   int _currentPage = 0;
   int _pageCount = 0;
@@ -323,23 +330,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
     });
   }
 
-  void _removePlacementForCurrentPage() {
-    if (_signatureImage == null) return;
-
-    final int countOnCurrentPage =
-        _placements.where((p) => p.page == _currentPage).length;
-    if (countOnCurrentPage <= 1) return;
-
-    setState(() {
-      for (int i = _placements.length - 1; i >= 0; i--) {
-        if (_placements[i].page == _currentPage) {
-          _placements.removeAt(i);
-          break;
-        }
-      }
-    });
-  }
-
   @override
   void dispose() {
     _pdfController = null;
@@ -358,7 +348,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Padding(
+          child: Padding(
             padding: EdgeInsets.all(24.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -668,7 +658,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
                           icon: Icon(
                             isRtl ? Icons.chevron_right : Icons.chevron_left,
                           ),
-                          label: const Text('Previous'),
+                          label: Text(
+                            widget.prevButtonMessage,
+                          ), // Use parameter
                         );
                       },
                     ),
@@ -699,7 +691,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
                           icon: Icon(
                             isRtl ? Icons.chevron_left : Icons.chevron_right,
                           ),
-                          label: const Text('Next'),
+                          label: Text(
+                            widget.nextButtonMessage,
+                          ), // Use parameter
                         );
                       },
                     ),
@@ -724,7 +718,12 @@ class _SignDocumentState extends State<SignDocumentPage> {
                       await _savePdfWithSignatures();
                     }
                   },
-                  child: Text(hasSignature ? 'Upload PDF' : 'Add Signature'),
+                  child: Text(
+                    hasSignature
+                        ? widget
+                            .uploadButtonMessage // Use parameter
+                        : widget.addSignatureMessage, // Use parameter
+                  ),
                 ),
               )
               : SizedBox(height: 60),
