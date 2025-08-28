@@ -1,4 +1,4 @@
-## 0.0.1
+## 1.0.0
 
 * Initial release
 * PDF viewing and navigation
