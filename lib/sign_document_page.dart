@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Image;
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:signdoc/widgets/create_sing_view_widget.dart';
 import 'package:signdoc/widgets/signature_overlay_widget.dart';
@@ -15,10 +15,11 @@ class SignDocumentPage extends StatefulWidget {
   final ValueChanged<Exception>? onError;
   final ValueChanged<File>? onSignedDocument;
   final ValueChanged<String>? onCancelled;
-  final String uploadButtonMessage; // Upload button message
-  final String nextButtonMessage; // Next button message
-  final String prevButtonMessage; // Previous button message
-  final String addSignatureMessage; // Add signature button message
+  final ValueChanged<ui.Image>? onSign;
+  final String uploadButtonMessage;
+  final String nextButtonMessage;
+  final String prevButtonMessage;
+  final String addSignatureMessage;
 
   const SignDocumentPage({
     super.key,
@@ -26,10 +27,11 @@ class SignDocumentPage extends StatefulWidget {
     this.onError,
     this.onSignedDocument,
     this.onCancelled,
-    this.uploadButtonMessage = 'Upload PDF', // Default value
-    this.nextButtonMessage = 'Next', // Default value
-    this.prevButtonMessage = 'Previous', // Default value
-    this.addSignatureMessage = 'Add Signature', // Default value
+    this.onSign,
+    this.uploadButtonMessage = 'Upload PDF',
+    this.nextButtonMessage = 'Next',
+    this.prevButtonMessage = 'Previous',
+    this.addSignatureMessage = 'Add Signature',
   });
 
   @override
@@ -118,7 +120,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
   }
 
   Future<void> _showPopupAndLoadSignature() async {
-    // Remember current page to restore after dialog closes
     _pageToRestore = _currentPage;
     if (mounted) {
       setState(() {
@@ -134,11 +135,10 @@ class _SignDocumentState extends State<SignDocumentPage> {
     final result = await showDialog<Map<String, Object?>>(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => CreateSingViewWidget(
-            key: Key('createSignatureDialog'),
-            onCancelled: widget.onCancelled,
-          ),
+      builder: (context) => CreateSingViewWidget(
+        key: Key('createSignatureDialog'),
+        onCancelled: widget.onCancelled,
+      ),
     );
 
     if (mounted) {
@@ -147,9 +147,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
         _pdfKey = UniqueKey();
       });
     }
-    // After making it visible, attempt to restore page soon after build
     if (_pageToRestore != null) {
-      // give a short delay to ensure controller gets attached
       await Future<void>.delayed(const Duration(milliseconds: 50));
       final controller = _pdfController;
       final target = _pageToRestore;
@@ -163,6 +161,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     if (result != null && result['image'] is ui.Image) {
       try {
         _signatureImage = result['image'] as ui.Image;
+        widget.onSign?.call(_signatureImage! as ui.Image);
         _signaturePng = await _sigUtils.imageToPngBytes(_signatureImage!);
         final count = (result['count'] as int?) ?? 1;
         _placements
@@ -214,11 +213,10 @@ class _SignDocumentState extends State<SignDocumentPage> {
         final pageW = pageSize.width;
         final pageH = pageSize.height;
 
-        final scale =
-            (viewerW / pageW).clamp(0, double.infinity) <
-                    (viewerH / pageH).clamp(0, double.infinity)
-                ? viewerW / pageW
-                : viewerH / pageH;
+        final scale = (viewerW / pageW).clamp(0, double.infinity) <
+                (viewerH / pageH).clamp(0, double.infinity)
+            ? viewerW / pageW
+            : viewerH / pageH;
 
         final displayedW = pageW * scale;
         final displayedH = pageH * scale;
@@ -242,11 +240,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
       final List<int> signedBytes = await document.save();
       document.dispose();
 
-      // Save the signed PDF to a file
       final signedFile = File('${_pdfPath!}_signed.pdf');
       await signedFile.writeAsBytes(signedBytes);
 
-      // Simulate upload process locally
       _showLoadingDialog();
       try {
         await Future<void>.delayed(const Duration(seconds: 2));
@@ -254,8 +250,13 @@ class _SignDocumentState extends State<SignDocumentPage> {
         _hideLoadingDialogIfAny();
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Upload successful')));
-        // Call onSignedDocument with the signed file
+        ).showSnackBar(SnackBar(
+          content: Text('Upload successful'),
+          backgroundColor: Colors.green[700],
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
         widget.onSignedDocument?.call(signedFile);
         setState(() {
           _signatureImage = null;
@@ -269,7 +270,13 @@ class _SignDocumentState extends State<SignDocumentPage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+          ).showSnackBar(SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
         }
       }
     } catch (e, s) {
@@ -279,9 +286,13 @@ class _SignDocumentState extends State<SignDocumentPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             key: Key('saveFailedSnack'),
             content: Text('Failed to save PDF'),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -348,6 +359,8 @@ class _SignDocumentState extends State<SignDocumentPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          backgroundColor: Colors.white,
+          elevation: 8,
           child: Padding(
             padding: EdgeInsets.all(24.0),
             child: Row(
@@ -356,10 +369,21 @@ class _SignDocumentState extends State<SignDocumentPage> {
                 SizedBox(
                   height: 28,
                   width: 28,
-                  child: CircularProgressIndicator(strokeWidth: 3),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF2A6BCC)),
+                  ),
                 ),
                 SizedBox(width: 16),
-                Text('Uploading...'),
+                Text(
+                  'Uploading...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[800],
+                  ),
+                ),
               ],
             ),
           ),
@@ -379,79 +403,110 @@ class _SignDocumentState extends State<SignDocumentPage> {
     final hasSignature = _signatureImage != null && _placements.isNotEmpty;
 
     return Scaffold(
-      key: const Key('signDocumentScaffold'),
-      backgroundColor: const Color(0xFFE0E8EA),
+      key: Key('signDocumentScaffold'),
+      backgroundColor: Color(0xFFF5F7F9),
       appBar: AppBar(
-        key: const Key('signDocumentAppBar'),
-        elevation: 0.0,
-        title: const Text('Sign Document', key: Key('signDocumentTitle')),
+        key: Key('signDocumentAppBar'),
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.2),
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF2A6BCC),
+        title: Text(
+          'Sign Document',
+          key: Key('signDocumentTitle'),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
         leading: IconButton(
-          key: const Key('backButton'),
+          key: Key('backButton'),
           onPressed: () {
             widget.onCancelled?.call("back button pressed");
           },
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, size: 24),
         ),
         actions: [
           if (_signatureImage != null)
             IconButton(
-              key: const Key('addSignatureIconButton'),
+              key: Key('addSignatureIconButton'),
               tooltip: 'Add another signature',
-              icon: const Icon(Icons.add_circle_outline),
+              icon: Icon(Icons.add_circle, size: 24),
+              color: Color(0xFF2A6BCC),
               onPressed: _addPlacementForCurrentPage,
             ),
         ],
         centerTitle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+        ),
       ),
       body: LayoutBuilder(
-        key: const Key('outerLayoutBuilder'),
+        key: Key('outerLayoutBuilder'),
         builder: (context, constraints) {
           return Column(
-            key: const Key('mainColumn'),
+            key: Key('mainColumn'),
             children: [
               Expanded(
-                key: const Key('pdfExpanded'),
-                child: LayoutBuilder(
-                  key: const Key('innerLayoutBuilder'),
-                  builder: (context, innerConstraints) {
-                    _pdfViewSize = Size(
-                      innerConstraints.maxWidth,
-                      innerConstraints.maxHeight,
-                    );
-                    return SizedBox(
-                      key: const Key('pdfSizedBox'),
-                      width: innerConstraints.maxWidth,
-                      height: innerConstraints.maxHeight,
-                      child:
-                          _pdfPath == null
-                              ? const Center(
-                                key: Key('loadingIndicator'),
-                                child: CircularProgressIndicator(),
-                              )
+                key: Key('pdfExpanded'),
+                child: Container(
+                  margin: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: LayoutBuilder(
+                      key: Key('innerLayoutBuilder'),
+                      builder: (context, innerConstraints) {
+                        _pdfViewSize = Size(
+                          innerConstraints.maxWidth,
+                          innerConstraints.maxHeight,
+                        );
+                        return SizedBox(
+                          key: Key('pdfSizedBox'),
+                          width: innerConstraints.maxWidth,
+                          height: innerConstraints.maxHeight,
+                          child: _pdfPath == null
+                              ? Center(
+                                  key: Key('loadingIndicator'),
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF2A6BCC)),
+                                  ),
+                                )
                               : InteractiveViewer(
-                                key: const Key('pdfInteractiveViewer'),
-                                transformationController:
-                                    _transformationController,
-                                minScale: 1.0,
-                                maxScale: 4.0,
-                                panEnabled: true,
-                                scaleEnabled: !_isPinchingSignature,
-                                clipBehavior: Clip.none,
-                                child: Stack(
-                                  key: const Key('pdfStack'),
-                                  children: [
-                                    Positioned.fill(
-                                      key: const Key('pdfPositionedFill'),
-                                      child:
-                                          _pdfVisible
-                                              ? PDFView(
+                                  key: Key('pdfInteractiveViewer'),
+                                  transformationController:
+                                      _transformationController,
+                                  minScale: 1.0,
+                                  maxScale: 4.0,
+                                  panEnabled: true,
+                                  scaleEnabled: !_isPinchingSignature,
+                                  clipBehavior: Clip.none,
+                                  child: Stack(
+                                    key: Key('pdfStack'),
+                                    children: [
+                                      Positioned.fill(
+                                        key: Key('pdfPositionedFill'),
+                                        child: _pdfVisible
+                                            ? PDFView(
                                                 key: _pdfKey,
                                                 filePath: _pdfPath!,
                                                 enableSwipe: false,
                                                 swipeHorizontal: true,
                                                 autoSpacing: true,
                                                 pageFling: false,
-                                                backgroundColor: Colors.grey,
+                                                backgroundColor:
+                                                    Colors.grey[200],
                                                 fitPolicy: FitPolicy.WIDTH,
                                                 onViewCreated: (
                                                   controller,
@@ -459,7 +514,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                                   setState(() {
                                                     _pdfController = controller;
                                                   });
-                                                  // Try restoring page after controller is ready
                                                   final target = _pageToRestore;
                                                   if (target != null) {
                                                     try {
@@ -473,7 +527,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                                   setState(() {
                                                     _pageCount = pages ?? 0;
                                                   });
-                                                  // Also try restoring here in case not yet done
                                                   final controller =
                                                       _pdfController;
                                                   final target = _pageToRestore;
@@ -487,7 +540,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                                   }
                                                 },
                                                 onPageChanged: (page, total) {
-                                                  // Once we receive a change to our intended page, clear restore flag
                                                   if (_pageToRestore != null &&
                                                       page == _pageToRestore) {
                                                     _pageToRestore = null;
@@ -517,216 +569,288 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                                   );
                                                 },
                                               )
-                                              : const SizedBox.shrink(),
-                                    ),
-                                    if (hasSignature)
-                                      ..._indicesForCurrentPage().map((idx) {
-                                        final placement = _placements[idx];
-                                        final img = _signatureImage!;
-                                        final baseW = img.width.toDouble();
-                                        final baseH = img.height.toDouble();
-                                        final width = baseW * placement.scale;
-                                        final height = baseH * placement.scale;
-                                        return SignatureOverlayWidget(
-                                          key: Key('signatureOverlay_$idx'),
-                                          left: placement.offsetDx,
-                                          top: placement.offsetDy,
-                                          width: width,
-                                          height: height,
-                                          image: img,
-                                          onDragDelta: (delta) {
-                                            setState(() {
-                                              final s =
-                                                  _currentScale == 0
-                                                      ? 1.0
-                                                      : _currentScale;
-                                              placement.offsetDx +=
-                                                  delta.dx / s;
-                                              placement.offsetDy +=
-                                                  delta.dy / s;
-                                            });
-                                          },
-                                          onResizeDelta: (delta) {
-                                            setState(() {
-                                              final s =
-                                                  _currentScale == 0
-                                                      ? 1.0
-                                                      : _currentScale;
-                                              final oldW =
-                                                  baseW * placement.scale;
-                                              final oldH =
-                                                  baseH * placement.scale;
-                                              final d =
-                                                  (delta.dx + delta.dy) /
-                                                  (300.0 * s);
-                                              final newScale =
-                                                  (placement.scale + d).clamp(
-                                                    0.2,
-                                                    3.0,
-                                                  );
-                                              final newW = baseW * newScale;
-                                              final newH = baseH * newScale;
-                                              placement.offsetDx +=
-                                                  (oldW - newW) / 2.0;
-                                              placement.offsetDy +=
-                                                  (oldH - newH) / 2.0;
-                                              placement.scale = newScale;
-                                            });
-                                          },
-                                          onPinchStart: () {
-                                            setState(() {
-                                              _isPinchingSignature = true;
-                                              _pinchInitialScale =
-                                                  placement.scale;
-                                            });
-                                          },
-                                          onPinchUpdate: (scaleFactor) {
-                                            if (_pinchInitialScale == null)
-                                              return;
-                                            setState(() {
-                                              final newScale =
-                                                  (_pinchInitialScale! *
-                                                          scaleFactor)
-                                                      .clamp(0.2, 3.0);
-                                              final currW =
-                                                  baseW * placement.scale;
-                                              final currH =
-                                                  baseH * placement.scale;
-                                              final centerX =
-                                                  placement.offsetDx +
-                                                  currW / 2.0;
-                                              final centerY =
-                                                  placement.offsetDy +
-                                                  currH / 2.0;
-                                              final newW = baseW * newScale;
-                                              final newH = baseH * newScale;
-                                              placement.offsetDx =
-                                                  centerX - newW / 2.0;
-                                              placement.offsetDy =
-                                                  centerY - newH / 2.0;
-                                              placement.scale = newScale;
-                                            });
-                                          },
-                                          onPinchEnd: () {
-                                            setState(() {
-                                              _isPinchingSignature = false;
-                                              _pinchInitialScale = null;
-                                            });
-                                          },
-                                          onDoubleTap: () {
-                                            setState(() {
-                                              final currentIndex = _placements
-                                                  .indexOf(placement);
-                                              if (currentIndex != -1) {
-                                                _placements.removeAt(
-                                                  currentIndex,
+                                            : SizedBox.shrink(),
+                                      ),
+                                      if (hasSignature)
+                                        ..._indicesForCurrentPage().map((idx) {
+                                          final placement = _placements[idx];
+                                          final img = _signatureImage!;
+                                          final baseW = img.width.toDouble();
+                                          final baseH = img.height.toDouble();
+                                          final width = baseW * placement.scale;
+                                          final height =
+                                              baseH * placement.scale;
+                                          return SignatureOverlayWidget(
+                                            key: Key('signatureOverlay_$idx'),
+                                            left: placement.offsetDx,
+                                            top: placement.offsetDy,
+                                            width: width,
+                                            height: height,
+                                            image: img,
+                                            onDragDelta: (delta) {
+                                              setState(() {
+                                                final s = _currentScale == 0
+                                                    ? 1.0
+                                                    : _currentScale;
+                                                placement.offsetDx +=
+                                                    delta.dx / s;
+                                                placement.offsetDy +=
+                                                    delta.dy / s;
+                                              });
+                                            },
+                                            onResizeDelta: (delta) {
+                                              setState(() {
+                                                final s = _currentScale == 0
+                                                    ? 1.0
+                                                    : _currentScale;
+                                                final oldW =
+                                                    baseW * placement.scale;
+                                                final oldH =
+                                                    baseH * placement.scale;
+                                                final d =
+                                                    (delta.dx + delta.dy) /
+                                                        (300.0 * s);
+                                                final newScale =
+                                                    (placement.scale + d).clamp(
+                                                  0.2,
+                                                  3.0,
                                                 );
-                                              }
-                                            });
-                                          },
-                                        );
-                                      }),
-                                  ],
+                                                final newW = baseW * newScale;
+                                                final newH = baseH * newScale;
+                                                placement.offsetDx +=
+                                                    (oldW - newW) / 2.0;
+                                                placement.offsetDy +=
+                                                    (oldH - newH) / 2.0;
+                                                placement.scale = newScale;
+                                              });
+                                            },
+                                            onPinchStart: () {
+                                              setState(() {
+                                                _isPinchingSignature = true;
+                                                _pinchInitialScale =
+                                                    placement.scale;
+                                              });
+                                            },
+                                            onPinchUpdate: (scaleFactor) {
+                                              if (_pinchInitialScale == null)
+                                                return;
+                                              setState(() {
+                                                final newScale =
+                                                    (_pinchInitialScale! *
+                                                            scaleFactor)
+                                                        .clamp(0.2, 3.0);
+                                                final currW =
+                                                    baseW * placement.scale;
+                                                final currH =
+                                                    baseH * placement.scale;
+                                                final centerX =
+                                                    placement.offsetDx +
+                                                        currW / 2.0;
+                                                final centerY =
+                                                    placement.offsetDy +
+                                                        currH / 2.0;
+                                                final newW = baseW * newScale;
+                                                final newH = baseH * newScale;
+                                                placement.offsetDx =
+                                                    centerX - newW / 2.0;
+                                                placement.offsetDy =
+                                                    centerY - newH / 2.0;
+                                                placement.scale = newScale;
+                                              });
+                                            },
+                                            onPinchEnd: () {
+                                              setState(() {
+                                                _isPinchingSignature = false;
+                                                _pinchInitialScale = null;
+                                              });
+                                            },
+                                            onDoubleTap: () {
+                                              setState(() {
+                                                final currentIndex = _placements
+                                                    .indexOf(placement);
+                                                if (currentIndex != -1) {
+                                                  _placements.removeAt(
+                                                    currentIndex,
+                                                  );
+                                                }
+                                              });
+                                            },
+                                          );
+                                        }),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(key: Key('bottomSpacing8'), height: 8),
-              if (_pageCount != 1)
-                Row(
-                  key: const Key('navigationRow'),
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Builder(
-                      key: const Key('prevButtonBuilder'),
-                      builder: (context) {
-                        final isRtl =
-                            Directionality.of(context) == TextDirection.rtl;
-                        return ElevatedButton.icon(
-                          key: const Key('prevButton'),
-                          onPressed:
-                              (_currentPage > 0 && _pdfController != null)
-                                  ? () async {
-                                    final prev = _currentPage - 1;
-                                    if (prev >= 0) {
-                                      await _pdfController!.setPage(prev);
-                                    }
-                                  }
-                                  : null,
-                          icon: Icon(
-                            isRtl ? Icons.chevron_right : Icons.chevron_left,
-                          ),
-                          label: Text(
-                            widget.prevButtonMessage,
-                          ), // Use parameter
                         );
                       },
                     ),
-                    const SizedBox(key: Key('spacing16a'), width: 16),
-                    Text(
-                      '${_currentPage + 1} / ${_pageCount == 0 ? '-' : _pageCount}',
-                      key: const Key('pageIndicator'),
-                    ),
-                    const SizedBox(key: Key('spacing16b'), width: 16),
-                    Builder(
-                      key: const Key('nextButtonBuilder'),
-                      builder: (context) {
-                        final isRtl =
-                            Directionality.of(context) == TextDirection.rtl;
-                        return ElevatedButton.icon(
-                          key: const Key('nextButton'),
-                          onPressed:
-                              (_pageCount > 0 &&
-                                      _currentPage < _pageCount - 1 &&
-                                      _pdfController != null)
-                                  ? () async {
+                  ),
+                ),
+              ),
+              SizedBox(key: Key('bottomSpacing16'), height: 16),
+              if (_pageCount != 0)
+                Container(
+                  key: Key('navigationContainer'),
+                  margin: EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    key: Key('navigationRow'),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Builder(
+                        key: Key('prevButtonBuilder'),
+                        builder: (context) {
+                          final isRtl =
+                              Directionality.of(context) == TextDirection.rtl;
+                          return ElevatedButton.icon(
+                            key: Key('prevButton'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF2A6BCC),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed:
+                                (_currentPage > 0 && _pdfController != null)
+                                    ? () async {
+                                        final prev = _currentPage - 1;
+                                        if (prev >= 0) {
+                                          await _pdfController!.setPage(prev);
+                                        }
+                                      }
+                                    : null,
+                            icon: Icon(
+                              isRtl ? Icons.chevron_right : Icons.chevron_left,
+                              size: 20,
+                            ),
+                            label: Text(
+                              widget.prevButtonMessage,
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          );
+                        },
+                      ),
+                      SizedBox(key: Key('spacing16a'), width: 16),
+                      Container(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_currentPage + 1} / ${_pageCount == 0 ? '-' : _pageCount}',
+                          key: Key('pageIndicator'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ),
+                      SizedBox(key: Key('spacing16b'), width: 16),
+                      Builder(
+                        key: Key('nextButtonBuilder'),
+                        builder: (context) {
+                          final isRtl =
+                              Directionality.of(context) == TextDirection.rtl;
+                          return ElevatedButton.icon(
+                            key: Key('nextButton'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF2A6BCC),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed: (_pageCount > 0 &&
+                                    _currentPage < _pageCount - 1 &&
+                                    _pdfController != null)
+                                ? () async {
                                     final next = _currentPage + 1;
                                     if (next < _pageCount) {
                                       await _pdfController!.setPage(next);
                                     }
                                   }
-                                  : null,
-                          icon: Icon(
-                            isRtl ? Icons.chevron_left : Icons.chevron_right,
-                          ),
-                          label: Text(
-                            widget.nextButtonMessage,
-                          ), // Use parameter
-                        );
-                      },
-                    ),
-                  ],
+                                : null,
+                            icon: Icon(
+                              isRtl ? Icons.chevron_left : Icons.chevron_right,
+                              size: 20,
+                            ),
+                            label: Text(
+                              widget.nextButtonMessage,
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
+              SizedBox(height: 16),
             ],
           );
         },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar:
-          hasSignature
-              ? Padding(
-                key: const Key('bottomButtonPadding'),
-                padding: const EdgeInsets.only(right: 12, left: 12, bottom: 60),
-                child: MaterialButton(
-                  key: const Key('signatureSaveButton'),
-                  onPressed: () async {
-                    if (!hasSignature) {
-                      await _showPopupAndLoadSignature();
-                    } else {
-                      await _savePdfWithSignatures();
-                    }
-                  },
-                  child: Text(
-                    hasSignature
-                        ? widget
-                            .uploadButtonMessage // Use parameter
-                        : widget.addSignatureMessage, // Use parameter
+      bottomNavigationBar: hasSignature
+          ? Container(
+              height: 80,
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: MaterialButton(
+                key: Key('signatureSaveButton'),
+                height: 50,
+                onPressed: () async {
+                  if (!hasSignature) {
+                    await _showPopupAndLoadSignature();
+                  } else {
+                    await _savePdfWithSignatures();
+                  }
+                },
+                color: Color(0xFF2A6BCC),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  hasSignature
+                      ? widget.uploadButtonMessage
+                      : widget.addSignatureMessage,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              )
-              : SizedBox(height: 60),
+              ),
+            )
+          : SizedBox(height: 80),
     );
   }
 }
@@ -745,4 +869,5 @@ mixin SignatureResult {
   void onSignatureSucceed(File file);
   void onSignatureFailed(Exception message);
   void onSignatureCancelled(String message);
+  void onSign(ui.Image signature);
 }
