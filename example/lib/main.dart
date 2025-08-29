@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide Image;
@@ -18,12 +17,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       home: const DocumentSigner(),
       theme: ThemeData(
-        primaryColor: Color(0xFF2A6BCC),
+        primaryColor: const Color(0xFF2A6BCC),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Color(0xFF2A6BCC),
-          primary: Color(0xFF2A6BCC),
+          seedColor: const Color(0xFF2A6BCC),
+          primary: const Color(0xFF2A6BCC),
         ),
-        appBarTheme: AppBarTheme(
+        appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Color(0xFF2A6BCC),
           elevation: 2,
@@ -46,7 +45,7 @@ class DocumentSigner extends StatefulWidget {
   State<DocumentSigner> createState() => _DocumentSignerState();
 }
 
-class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
+class _DocumentSignerState extends State<DocumentSigner> {
   File? _selectedFile;
 
   Future<void> _pickFile() async {
@@ -72,7 +71,7 @@ class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
           shadowColor: Colors.black.withOpacity(0.1),
         ),
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -93,18 +92,18 @@ class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),
                         blurRadius: 12,
-                        offset: Offset(0, 4),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.description_outlined,
                     size: 60,
                     color: Color(0xFF2A6BCC),
                   ),
                 ),
-                SizedBox(height: 32),
-                Text(
+                const SizedBox(height: 32),
+                const Text(
                   "Sign Your Documents",
                   style: TextStyle(
                     fontSize: 24,
@@ -112,33 +111,36 @@ class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
                     color: Color(0xFF2A6BCC),
                   ),
                 ),
-                SizedBox(height: 16),
-                Padding(
+                const SizedBox(height: 16),
+                const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
                     "Select a PDF document to add your signature and create a legally binding document",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[700],
+                      color: Colors.black54,
                       height: 1.5,
                     ),
                   ),
                 ),
-                SizedBox(height: 40),
+                const SizedBox(height: 40),
                 ElevatedButton(
                   onPressed: _pickFile,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF2A6BCC),
+                    backgroundColor: const Color(0xFF2A6BCC),
                     foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 3,
-                    shadowColor: Color(0xFF2A6BCC).withOpacity(0.3),
+                    shadowColor: const Color(0xFF2A6BCC).withOpacity(0.3),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.upload_file, size: 20),
@@ -153,7 +155,7 @@ class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
                     ],
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 Text(
                   "Supported format: PDF",
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
@@ -167,54 +169,51 @@ class _DocumentSignerState extends State<DocumentSigner> with SignatureResult {
 
     return SignDocumentPage(
       file: _selectedFile!,
-      onError: onSignatureFailed,
-      onSignedDocument: onSignatureSucceed,
-      onCancelled: onSignatureCancelled,
+      onError: (message) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message.toString()),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        setState(() {
+          _selectedFile = null;
+        });
+      },
+      onSignedDocument: (file) async {
+        debugPrint("Signed file path: ${file.path}");
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Document signed successfully!"),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+
+        // Open the signed file immediately
+        await OpenFilex.open(file.path);
+
+        // Reset state so user can sign another document
+        setState(() {
+          _selectedFile = null;
+        });
+      },
+      onCancelled: (reason) {
+        setState(() {
+          _selectedFile = null;
+        });
+      },
       uploadButtonMessage: "Save PDF",
+      signatureColor: Colors.black,
+      onSign: (file) {},
     );
-  }
-
-  @override
-  void onSignatureFailed(Exception message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Signature failed: $message"),
-        backgroundColor: Colors.red[700],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
-  @override
-  void onSignatureSucceed(File file) async {
-    debugPrint("Signed file path: ${file.path}");
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Document signed successfully!"),
-        backgroundColor: Colors.green[700],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-
-    // Open the signed file immediately
-    await OpenFilex.open(file.path);
-    _selectedFile = null;
-    setState(() {});
-  }
-
-  @override
-  void onSignatureCancelled(String message) {
-    debugPrint(message);
-    setState(() {
-      _selectedFile = null;
-    });
-  }
-
-  @override
-  void onSign(Image signature) {
-    // TODO: implement onSign
   }
 }

@@ -16,10 +16,27 @@ class SignDocumentPage extends StatefulWidget {
   final ValueChanged<File>? onSignedDocument;
   final ValueChanged<String>? onCancelled;
   final ValueChanged<ui.Image>? onSign;
+  final ValueChanged<int>? onPageChanged;
+  final ValueChanged<List<SignaturePlacement>>? onPlacementsChanged;
+  final ValueChanged<bool>? onSignatureModeChanged;
+  final Widget Function(BuildContext, int, int)? pageIndicatorBuilder;
+  final Widget Function(BuildContext)? loadingIndicatorBuilder;
+  final Widget Function(BuildContext, Exception)? errorWidgetBuilder;
   final String uploadButtonMessage;
   final String nextButtonMessage;
   final String prevButtonMessage;
   final String addSignatureMessage;
+  final Color primaryColor;
+  final Color backgroundColor;
+  final Color signatureColor;
+  final double minSignatureScale;
+  final double maxSignatureScale;
+  final bool enableMultipleSignatures;
+  final bool enableSignatureDeletion;
+  final bool enableSignatureResizing;
+  final bool enableSignatureRotation;
+  final bool showPageNavigation;
+  final bool showSignatureCount;
 
   const SignDocumentPage({
     super.key,
@@ -28,10 +45,27 @@ class SignDocumentPage extends StatefulWidget {
     this.onSignedDocument,
     this.onCancelled,
     this.onSign,
+    this.onPageChanged,
+    this.onPlacementsChanged,
+    this.onSignatureModeChanged,
+    this.pageIndicatorBuilder,
+    this.loadingIndicatorBuilder,
+    this.errorWidgetBuilder,
     this.uploadButtonMessage = 'Upload PDF',
     this.nextButtonMessage = 'Next',
     this.prevButtonMessage = 'Previous',
     this.addSignatureMessage = 'Add Signature',
+    this.primaryColor = const Color(0xFF2A6BCC),
+    this.backgroundColor = const Color(0xFFF5F7F9),
+    this.signatureColor = Colors.black,
+    this.minSignatureScale = 0.2,
+    this.maxSignatureScale = 3.0,
+    this.enableMultipleSignatures = true,
+    this.enableSignatureDeletion = true,
+    this.enableSignatureResizing = true,
+    this.enableSignatureRotation = false,
+    this.showPageNavigation = true,
+    this.showSignatureCount = false,
   });
 
   @override
@@ -90,6 +124,10 @@ class _SignDocumentState extends State<SignDocumentPage> {
         await WidgetsBinding.instance.endOfFrame;
       } catch (e, s) {
         debugPrint('End of frame error: $e\n$s');
+        if (mounted) {
+          _handleError(
+              e is Exception ? e : Exception('Initialization error: $e'));
+        }
       }
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
@@ -99,6 +137,14 @@ class _SignDocumentState extends State<SignDocumentPage> {
         _pdfVisible = true;
       });
     });
+  }
+
+  void _handleError(Exception error) {
+    widget.onError?.call(error);
+    if (widget.errorWidgetBuilder != null) {
+      // Error widget would be shown in build method
+      setState(() {});
+    }
   }
 
   Future<void> _loadInitialPdf() async {
@@ -113,13 +159,12 @@ class _SignDocumentState extends State<SignDocumentPage> {
       }
     } catch (e) {
       debugPrint('Error loading PDF: $e');
-      widget.onError?.call(
-        e is Exception ? e : Exception('Failed to load PDF: $e'),
-      );
+      _handleError(e is Exception ? e : Exception('Failed to load PDF: $e'));
     }
   }
 
   Future<void> _showPopupAndLoadSignature() async {
+    widget.onSignatureModeChanged?.call(true);
     _pageToRestore = _currentPage;
     if (mounted) {
       setState(() {
@@ -132,12 +177,14 @@ class _SignDocumentState extends State<SignDocumentPage> {
       } catch (_) {}
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
+
     final result = await showDialog<Map<String, Object?>>(
       context: context,
       barrierDismissible: false,
       builder: (context) => CreateSingViewWidget(
         key: Key('createSignatureDialog'),
         onCancelled: widget.onCancelled,
+        signatureColor: widget.signatureColor,
       ),
     );
 
@@ -147,6 +194,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
         _pdfKey = UniqueKey();
       });
     }
+
+    widget.onSignatureModeChanged?.call(false);
+
     if (_pageToRestore != null) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       final controller = _pdfController;
@@ -161,7 +211,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     if (result != null && result['image'] is ui.Image) {
       try {
         _signatureImage = result['image'] as ui.Image;
-        widget.onSign?.call(_signatureImage! as ui.Image);
+        widget.onSign?.call(_signatureImage!);
         _signaturePng = await _sigUtils.imageToPngBytes(_signatureImage!);
         final count = (result['count'] as int?) ?? 1;
         _placements
@@ -172,6 +222,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
               currentPage: _currentPage,
             ),
           );
+
+        widget.onPlacementsChanged?.call(_placements);
+
         for (final p in _placements.where((p) => p.page == _currentPage)) {
           _centerPlacement(p);
         }
@@ -182,18 +235,15 @@ class _SignDocumentState extends State<SignDocumentPage> {
         setState(() {});
       } catch (e, s) {
         debugPrint('Error loading signature: $e\n$s');
-        widget.onError?.call(
-          e is Exception ? e : Exception('Failed to load signature: $e'),
-        );
+        _handleError(
+            e is Exception ? e : Exception('Failed to load signature: $e'));
       }
     }
   }
 
   Future<void> _savePdfWithSignatures() async {
     if (_pdfPath == null || _signaturePng == null || _signatureImage == null) {
-      widget.onError?.call(
-        Exception('Cannot save: Missing PDF or signature data'),
-      );
+      _handleError(Exception('Cannot save: Missing PDF or signature data'));
       return;
     }
     try {
@@ -263,39 +313,15 @@ class _SignDocumentState extends State<SignDocumentPage> {
           _signaturePng = null;
           _placements.clear();
         });
+        widget.onPlacementsChanged?.call(_placements);
       } catch (e) {
         _hideLoadingDialogIfAny();
         final error = Exception('Upload failed: $e');
-        widget.onError?.call(error);
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red[700],
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ));
-        }
+        _handleError(error);
       }
     } catch (e, s) {
       debugPrint('Error saving PDF: $e\n$s');
-      widget.onError?.call(
-        e is Exception ? e : Exception('Failed to save PDF: $e'),
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            key: Key('saveFailedSnack'),
-            content: Text('Failed to save PDF'),
-            backgroundColor: Colors.red[700],
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
+      _handleError(e is Exception ? e : Exception('Failed to save PDF: $e'));
     }
   }
 
@@ -330,7 +356,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
   }
 
   void _addPlacementForCurrentPage() {
-    if (_signatureImage == null) return;
+    if (_signatureImage == null || !widget.enableMultipleSignatures) return;
     setState(() {
       final p = _sigUtils.addPlacementForPage(
         placements: _placements,
@@ -338,6 +364,18 @@ class _SignDocumentState extends State<SignDocumentPage> {
       );
       _centerPlacement(p);
       _placements.add(p);
+      widget.onPlacementsChanged?.call(_placements);
+    });
+  }
+
+  void _removePlacement(SignaturePlacement placement) {
+    if (!widget.enableSignatureDeletion) return;
+    setState(() {
+      final currentIndex = _placements.indexOf(placement);
+      if (currentIndex != -1) {
+        _placements.removeAt(currentIndex);
+        widget.onPlacementsChanged?.call(_placements);
+      }
     });
   }
 
@@ -372,7 +410,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                   child: CircularProgressIndicator(
                     strokeWidth: 3,
                     valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFF2A6BCC)),
+                        AlwaysStoppedAnimation<Color>(widget.primaryColor),
                   ),
                 ),
                 SizedBox(width: 16),
@@ -398,19 +436,83 @@ class _SignDocumentState extends State<SignDocumentPage> {
     }
   }
 
+  Widget _buildPageIndicator() {
+    if (widget.pageIndicatorBuilder != null) {
+      return widget.pageIndicatorBuilder!(context, _currentPage, _pageCount);
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '${_currentPage + 1} / ${_pageCount == 0 ? '-' : _pageCount}',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[800],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    if (widget.loadingIndicatorBuilder != null) {
+      return widget.loadingIndicatorBuilder!(context);
+    }
+
+    return Center(
+      child: CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(widget.primaryColor),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(Exception error) {
+    if (widget.errorWidgetBuilder != null) {
+      return widget.errorWidgetBuilder!(context, error);
+    }
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 48, color: Colors.red),
+          SizedBox(height: 16),
+          Text(
+            'Error loading document',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          SizedBox(height: 8),
+          Text(
+            error.toString(),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasSignature = _signatureImage != null && _placements.isNotEmpty;
+    final signaturesOnCurrentPage = _indicesForCurrentPage().length;
+
+    if (_pdfPath == null) {
+      return _buildLoadingIndicator();
+    }
 
     return Scaffold(
       key: Key('signDocumentScaffold'),
-      backgroundColor: Color(0xFFF5F7F9),
+      backgroundColor: widget.backgroundColor,
       appBar: AppBar(
         key: Key('signDocumentAppBar'),
         elevation: 2,
         shadowColor: Colors.black.withOpacity(0.2),
         backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF2A6BCC),
+        foregroundColor: widget.primaryColor,
         title: Text(
           'Sign Document',
           key: Key('signDocumentTitle'),
@@ -427,12 +529,28 @@ class _SignDocumentState extends State<SignDocumentPage> {
           icon: Icon(Icons.arrow_back, size: 24),
         ),
         actions: [
-          if (_signatureImage != null)
+          if (widget.showSignatureCount && signaturesOnCurrentPage > 0)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: widget.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$signaturesOnCurrentPage',
+                style: TextStyle(
+                  color: widget.primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          if (_signatureImage != null && widget.enableMultipleSignatures)
             IconButton(
               key: Key('addSignatureIconButton'),
               tooltip: 'Add another signature',
               icon: Icon(Icons.add_circle, size: 24),
-              color: Color(0xFF2A6BCC),
+              color: widget.primaryColor,
               onPressed: _addPlacementForCurrentPage,
             ),
         ],
@@ -475,170 +593,125 @@ class _SignDocumentState extends State<SignDocumentPage> {
                           key: Key('pdfSizedBox'),
                           width: innerConstraints.maxWidth,
                           height: innerConstraints.maxHeight,
-                          child: _pdfPath == null
-                              ? Center(
-                                  key: Key('loadingIndicator'),
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF2A6BCC)),
-                                  ),
-                                )
-                              : InteractiveViewer(
-                                  key: Key('pdfInteractiveViewer'),
-                                  transformationController:
-                                      _transformationController,
-                                  minScale: 1.0,
-                                  maxScale: 4.0,
-                                  panEnabled: true,
-                                  scaleEnabled: !_isPinchingSignature,
-                                  clipBehavior: Clip.none,
-                                  child: Stack(
-                                    key: Key('pdfStack'),
-                                    children: [
-                                      Positioned.fill(
-                                        key: Key('pdfPositionedFill'),
-                                        child: _pdfVisible
-                                            ? PDFView(
-                                                key: _pdfKey,
-                                                filePath: _pdfPath!,
-                                                enableSwipe: false,
-                                                swipeHorizontal: true,
-                                                autoSpacing: true,
-                                                pageFling: false,
-                                                backgroundColor:
-                                                    Colors.grey[200],
-                                                fitPolicy: FitPolicy.WIDTH,
-                                                onViewCreated: (
-                                                  controller,
-                                                ) async {
+                          child: InteractiveViewer(
+                            key: Key('pdfInteractiveViewer'),
+                            transformationController: _transformationController,
+                            minScale: 1.0,
+                            maxScale: 4.0,
+                            panEnabled: true,
+                            scaleEnabled: !_isPinchingSignature,
+                            clipBehavior: Clip.none,
+                            child: Stack(
+                              key: Key('pdfStack'),
+                              children: [
+                                Positioned.fill(
+                                  key: Key('pdfPositionedFill'),
+                                  child: _pdfVisible
+                                      ? PDFView(
+                                          key: _pdfKey,
+                                          filePath: _pdfPath!,
+                                          enableSwipe: false,
+                                          swipeHorizontal: true,
+                                          autoSpacing: true,
+                                          pageFling: false,
+                                          backgroundColor: Colors.grey[200],
+                                          fitPolicy: FitPolicy.WIDTH,
+                                          onViewCreated: (controller) async {
+                                            setState(() {
+                                              _pdfController = controller;
+                                            });
+                                            final target = _pageToRestore;
+                                            if (target != null) {
+                                              try {
+                                                await controller
+                                                    .setPage(target);
+                                              } catch (_) {}
+                                            }
+                                          },
+                                          onRender: (pages) async {
+                                            setState(() {
+                                              _pageCount = pages ?? 0;
+                                            });
+                                            final controller = _pdfController;
+                                            final target = _pageToRestore;
+                                            if (controller != null &&
+                                                target != null) {
+                                              try {
+                                                await controller
+                                                    .setPage(target);
+                                              } catch (_) {}
+                                            }
+                                          },
+                                          onPageChanged: (page, total) {
+                                            if (_pageToRestore != null &&
+                                                page == _pageToRestore) {
+                                              _pageToRestore = null;
+                                            }
+                                            setState(() {
+                                              _currentPage = page ?? 0;
+                                              _pageCount = total ?? _pageCount;
+                                            });
+                                            widget.onPageChanged
+                                                ?.call(_currentPage);
+                                          },
+                                          onError: (error) {
+                                            debugPrint(error.toString());
+                                            _handleError(Exception(
+                                                'PDFView error: $error'));
+                                          },
+                                          onPageError: (page, error) {
+                                            debugPrint(
+                                                '$page: ${error.toString()}');
+                                            _handleError(Exception(
+                                                'PDFView page $page error: $error'));
+                                          },
+                                        )
+                                      : SizedBox.shrink(),
+                                ),
+                                if (hasSignature)
+                                  ..._indicesForCurrentPage().map((idx) {
+                                    final placement = _placements[idx];
+                                    final img = _signatureImage!;
+                                    final baseW = img.width.toDouble();
+                                    final baseH = img.height.toDouble();
+                                    final width = baseW * placement.scale;
+                                    final height = baseH * placement.scale;
+                                    return SignatureOverlayWidget(
+                                      key: Key('signatureOverlay_$idx'),
+                                      left: placement.offsetDx,
+                                      top: placement.offsetDy,
+                                      width: width,
+                                      height: height,
+                                      image: img,
+                                      onDragDelta: (delta) {
+                                        setState(() {
+                                          placement.offsetDx += delta.dx;
+                                          placement.offsetDy += delta.dy;
+                                        });
+                                      },
+                                      onPinchStart:
+                                          widget.enableSignatureResizing
+                                              ? () {
                                                   setState(() {
-                                                    _pdfController = controller;
+                                                    _isPinchingSignature = true;
+                                                    _pinchInitialScale =
+                                                        placement.scale;
                                                   });
-                                                  final target = _pageToRestore;
-                                                  if (target != null) {
-                                                    try {
-                                                      await controller.setPage(
-                                                        target,
-                                                      );
-                                                    } catch (_) {}
-                                                  }
-                                                },
-                                                onRender: (pages) async {
-                                                  setState(() {
-                                                    _pageCount = pages ?? 0;
-                                                  });
-                                                  final controller =
-                                                      _pdfController;
-                                                  final target = _pageToRestore;
-                                                  if (controller != null &&
-                                                      target != null) {
-                                                    try {
-                                                      await controller.setPage(
-                                                        target,
-                                                      );
-                                                    } catch (_) {}
-                                                  }
-                                                },
-                                                onPageChanged: (page, total) {
-                                                  if (_pageToRestore != null &&
-                                                      page == _pageToRestore) {
-                                                    _pageToRestore = null;
-                                                  }
-                                                  setState(() {
-                                                    _currentPage = page ?? 0;
-                                                    _pageCount =
-                                                        total ?? _pageCount;
-                                                  });
-                                                },
-                                                onError: (error) {
-                                                  debugPrint(error.toString());
-                                                  widget.onError?.call(
-                                                    Exception(
-                                                      'PDFView error: $error',
-                                                    ),
-                                                  );
-                                                },
-                                                onPageError: (page, error) {
-                                                  debugPrint(
-                                                    '$page: ${error.toString()}',
-                                                  );
-                                                  widget.onError?.call(
-                                                    Exception(
-                                                      'PDFView page $page error: $error',
-                                                    ),
-                                                  );
-                                                },
-                                              )
-                                            : SizedBox.shrink(),
-                                      ),
-                                      if (hasSignature)
-                                        ..._indicesForCurrentPage().map((idx) {
-                                          final placement = _placements[idx];
-                                          final img = _signatureImage!;
-                                          final baseW = img.width.toDouble();
-                                          final baseH = img.height.toDouble();
-                                          final width = baseW * placement.scale;
-                                          final height =
-                                              baseH * placement.scale;
-                                          return SignatureOverlayWidget(
-                                            key: Key('signatureOverlay_$idx'),
-                                            left: placement.offsetDx,
-                                            top: placement.offsetDy,
-                                            width: width,
-                                            height: height,
-                                            image: img,
-                                            onDragDelta: (delta) {
-                                              setState(() {
-                                                final s = _currentScale == 0
-                                                    ? 1.0
-                                                    : _currentScale;
-                                                placement.offsetDx +=
-                                                    delta.dx / s;
-                                                placement.offsetDy +=
-                                                    delta.dy / s;
-                                              });
-                                            },
-                                            onResizeDelta: (delta) {
-                                              setState(() {
-                                                final s = _currentScale == 0
-                                                    ? 1.0
-                                                    : _currentScale;
-                                                final oldW =
-                                                    baseW * placement.scale;
-                                                final oldH =
-                                                    baseH * placement.scale;
-                                                final d =
-                                                    (delta.dx + delta.dy) /
-                                                        (300.0 * s);
-                                                final newScale =
-                                                    (placement.scale + d).clamp(
-                                                  0.2,
-                                                  3.0,
-                                                );
-                                                final newW = baseW * newScale;
-                                                final newH = baseH * newScale;
-                                                placement.offsetDx +=
-                                                    (oldW - newW) / 2.0;
-                                                placement.offsetDy +=
-                                                    (oldH - newH) / 2.0;
-                                                placement.scale = newScale;
-                                              });
-                                            },
-                                            onPinchStart: () {
-                                              setState(() {
-                                                _isPinchingSignature = true;
-                                                _pinchInitialScale =
-                                                    placement.scale;
-                                              });
-                                            },
-                                            onPinchUpdate: (scaleFactor) {
+                                                }
+                                              : null,
+                                      onPinchUpdate: widget
+                                              .enableSignatureResizing
+                                          ? (scaleFactor) {
                                               if (_pinchInitialScale == null)
                                                 return;
                                               setState(() {
-                                                final newScale =
-                                                    (_pinchInitialScale! *
-                                                            scaleFactor)
-                                                        .clamp(0.2, 3.0);
+                                                final newScale = (_pinchInitialScale! *
+                                                        scaleFactor)
+                                                    .clamp(
+                                                        widget
+                                                            .minSignatureScale,
+                                                        widget
+                                                            .maxSignatureScale);
                                                 final currW =
                                                     baseW * placement.scale;
                                                 final currH =
@@ -657,29 +730,30 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                                     centerY - newH / 2.0;
                                                 placement.scale = newScale;
                                               });
-                                            },
-                                            onPinchEnd: () {
+                                              widget.onPlacementsChanged
+                                                  ?.call(_placements);
+                                            }
+                                          : null,
+                                      onPinchEnd: widget.enableSignatureResizing
+                                          ? () {
                                               setState(() {
                                                 _isPinchingSignature = false;
                                                 _pinchInitialScale = null;
                                               });
-                                            },
-                                            onDoubleTap: () {
-                                              setState(() {
-                                                final currentIndex = _placements
-                                                    .indexOf(placement);
-                                                if (currentIndex != -1) {
-                                                  _placements.removeAt(
-                                                    currentIndex,
-                                                  );
+                                            }
+                                          : null,
+                                      onDoubleTap:
+                                          widget.enableSignatureDeletion
+                                              ? () {
+                                                  _removePlacement(placement);
                                                 }
-                                              });
-                                            },
-                                          );
-                                        }),
-                                    ],
-                                  ),
-                                ),
+                                              : null,
+                                      onResizeDelta: (Offset value) {},
+                                    );
+                                  }),
+                              ],
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -687,7 +761,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                 ),
               ),
               SizedBox(key: Key('bottomSpacing16'), height: 16),
-              if (_pageCount != 0)
+              if (widget.showPageNavigation && _pageCount > 1)
                 Container(
                   key: Key('navigationContainer'),
                   margin: EdgeInsets.symmetric(horizontal: 16),
@@ -715,7 +789,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                           return ElevatedButton.icon(
                             key: Key('prevButton'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF2A6BCC),
+                              backgroundColor: widget.primaryColor,
                               foregroundColor: Colors.white,
                               padding: EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 10),
@@ -745,22 +819,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                         },
                       ),
                       SizedBox(key: Key('spacing16a'), width: 16),
-                      Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${_currentPage + 1} / ${_pageCount == 0 ? '-' : _pageCount}',
-                          key: Key('pageIndicator'),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                      ),
+                      _buildPageIndicator(),
                       SizedBox(key: Key('spacing16b'), width: 16),
                       Builder(
                         key: Key('nextButtonBuilder'),
@@ -770,7 +829,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                           return ElevatedButton.icon(
                             key: Key('nextButton'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF2A6BCC),
+                              backgroundColor: widget.primaryColor,
                               foregroundColor: Colors.white,
                               padding: EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 10),
@@ -833,7 +892,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                     await _savePdfWithSignatures();
                   }
                 },
-                color: Color(0xFF2A6BCC),
+                color: widget.primaryColor,
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -855,19 +914,12 @@ class _SignDocumentState extends State<SignDocumentPage> {
   }
 }
 
-@override
-void onSignatureSucceed(File file) {
-  debugPrint('Signed document saved: ${file.path}');
-}
-
-@override
-void onSignatureFailed(Exception message) {
-  debugPrint('Signature failed: $message');
-}
-
 mixin SignatureResult {
   void onSignatureSucceed(File file);
   void onSignatureFailed(Exception message);
   void onSignatureCancelled(String message);
   void onSign(ui.Image signature);
+  void onPageChanged(int currentPage);
+  void onPlacementsChanged(List<SignaturePlacement> placements);
+  void onSignatureModeChanged(bool isSignatureMode);
 }

@@ -5,8 +5,10 @@ import 'package:syncfusion_flutter_signaturepad/signaturepad.dart';
 
 class CreateSingViewWidget extends StatefulWidget {
   final ValueChanged<String>? onCancelled;
+  final ui.Color signatureColor;
 
-  const CreateSingViewWidget({super.key, this.onCancelled});
+  const CreateSingViewWidget(
+      {super.key, this.onCancelled, required this.signatureColor});
 
   @override
   State<CreateSingViewWidget> createState() => _CreateSingViewWidgetState();
@@ -86,7 +88,7 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                     key: _signatureKey,
                     minimumStrokeWidth: 1,
                     maximumStrokeWidth: 3,
-                    strokeColor: Colors.black,
+                    strokeColor: widget.signatureColor,
                     backgroundColor: Colors.transparent,
                   ),
                 ),

@@ -1,8 +1,5 @@
 ## 1.0.0
 
-* Initial release
-* PDF viewing and navigation
-* Digital signature creation
-* Signature manipulation (drag, resize, rotate)
-* Multipage document support
-* Customizable UI messages
+* Add more customization options for signature appearance
+* Improve performance for large documents
+* Fix minor bugs in signature placement
