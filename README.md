@@ -2,9 +2,10 @@
 
 A powerful Flutter package for adding digital signatures to PDF documents. Integrate signature functionality into your Flutter applications with a beautiful, customizable UI.
 
-![Demo Animation](https://raw.githubusercontent.com/RiadhG-Hub/signdoc/main/example/demo.gif)
-![Demo Animation](https://raw.githubusercontent.com/RiadhG-Hub/signdoc/main/example/demo2.gif)
-![Demo Animation](https://raw.githubusercontent.com/RiadhG-Hub/signdoc/main/example/demo3.gif)
+<img src="https://raw.githubusercontent.com/RiadhG-Hub/signdoc/main/example/demo.gif" width="300" height="200" alt="Demo Animation 1" />
+<img src="https://raw.githubusercontent.com/RiadhG-Hub/signdoc/main/example/demo2.gif" width="300" height="200" alt="Demo Animation 2" />
+<img src="https://raw.githubusercontent.com/RiadhG-Hub/signdoc/main/example/demo3.gif" width="300" height="200" alt="Demo Animation 3" />
+
 
 
 
