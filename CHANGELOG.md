@@ -1,5 +1,3 @@
-## 1.0.0
+## 1.0.0+2
 
-* Add more customization options for signature appearance
-* Improve performance for large documents
-* Fix minor bugs in signature placement
+* fix demo code
