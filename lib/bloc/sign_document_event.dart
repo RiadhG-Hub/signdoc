@@ -13,5 +13,6 @@ class PrepareSignedDocument extends SignDocumentEvent {
 class UploadSignedDocumentRequested extends SignDocumentEvent {
   final Uint8List bytes;
   final String fileName;
-  const UploadSignedDocumentRequested({required this.bytes, required this.fileName});
+  const UploadSignedDocumentRequested(
+      {required this.bytes, required this.fileName});
 }

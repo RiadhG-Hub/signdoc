@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_signaturepad/signaturepad.dart';
 
@@ -31,7 +32,7 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 20,
               offset: Offset(0, 10),
             ),
@@ -169,7 +170,10 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                             'count': signatureCount,
                           });
                         } catch (e, s) {
-                          print("error: $e, stack: $s");
+                          if (kDebugMode) {
+                            print("error: $e, stack: $s");
+                          }
+                          rethrow;
                         }
                       },
                       style: ElevatedButton.styleFrom(

@@ -70,7 +70,8 @@ class SignatureOverlayWidget extends StatelessWidget {
               width: width,
               height: height,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent.withOpacity(0.4)),
+                border:
+                    Border.all(color: Colors.blueAccent.withValues(alpha: 0.4)),
               ),
               child: RawImage(image: image, fit: BoxFit.contain),
             ),

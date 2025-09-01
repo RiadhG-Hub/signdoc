@@ -113,7 +113,7 @@ class PdfDownloader {
       final uri = Uri.parse(url);
       final base = p.basename(uri.path);
       if (base.toLowerCase().endsWith('.pdf')) return base;
-      return (base.isEmpty ? 'download' : base) + '.pdf';
+      return '${base.isEmpty ? 'download' : base}.pdf';
     } catch (_) {
       return 'download.pdf';
     }

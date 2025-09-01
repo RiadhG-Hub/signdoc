@@ -177,7 +177,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
       } catch (_) {}
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
-
+    if (!mounted) return;
     final result = await showDialog<Map<String, Object?>>(
       context: context,
       barrierDismissible: false,
@@ -469,32 +469,6 @@ class _SignDocumentState extends State<SignDocumentPage> {
     );
   }
 
-  Widget _buildErrorWidget(Exception error) {
-    if (widget.errorWidgetBuilder != null) {
-      return widget.errorWidgetBuilder!(context, error);
-    }
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 48, color: Colors.red),
-          SizedBox(height: 16),
-          Text(
-            'Error loading document',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-          SizedBox(height: 8),
-          Text(
-            error.toString(),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final hasSignature = _signatureImage != null && _placements.isNotEmpty;
@@ -510,7 +484,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
       appBar: AppBar(
         key: Key('signDocumentAppBar'),
         elevation: 2,
-        shadowColor: Colors.black.withOpacity(0.2),
+        shadowColor: Colors.black.withValues(alpha: 0.2),
         backgroundColor: Colors.white,
         foregroundColor: widget.primaryColor,
         title: Text(
@@ -534,7 +508,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               margin: EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: widget.primaryColor.withOpacity(0.1),
+                color: widget.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -574,7 +548,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: Offset(0, 2),
                       ),
@@ -702,8 +676,9 @@ class _SignDocumentState extends State<SignDocumentPage> {
                                       onPinchUpdate: widget
                                               .enableSignatureResizing
                                           ? (scaleFactor) {
-                                              if (_pinchInitialScale == null)
+                                              if (_pinchInitialScale == null) {
                                                 return;
+                                              }
                                               setState(() {
                                                 final newScale = (_pinchInitialScale! *
                                                         scaleFactor)
@@ -771,7 +746,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 6,
                         offset: Offset(0, 2),
                       ),
@@ -876,7 +851,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: Offset(0, -2),
                   ),

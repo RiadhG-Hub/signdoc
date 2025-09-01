@@ -68,7 +68,7 @@ class _DocumentSignerState extends State<DocumentSigner> {
         appBar: AppBar(
           title: const Text("Document Signer"),
           elevation: 2,
-          shadowColor: Colors.black.withOpacity(0.1),
+          shadowColor: Colors.black.withValues(alpha: 0.1),
         ),
         body: Container(
           decoration: const BoxDecoration(
@@ -90,7 +90,7 @@ class _DocumentSignerState extends State<DocumentSigner> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -138,7 +138,7 @@ class _DocumentSignerState extends State<DocumentSigner> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 3,
-                    shadowColor: const Color(0xFF2A6BCC).withOpacity(0.3),
+                    shadowColor: const Color(0xFF2A6BCC).withValues(alpha: 0.3),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
