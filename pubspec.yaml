@@ -3,7 +3,7 @@ description: A Flutter package for PDF viewing and signing with signature pad su
 version: 1.0.2
 homepage: https://github.com/RiadhG-Hub/signdoc
 repository: https://github.com/RiadhG-Hub/signdoc
-issue_tracker: https://github.com/RiadhG-Hub/signdoc/issues
+issue_tracker: https://github.com/RiadhG-Hub/signdoc/issues/
 documentation: https://github.com/RiadhG-Hub/signdoc#readme
 
 environment:
