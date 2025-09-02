@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:dio/dio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
@@ -12,71 +11,6 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 /// - downloadExample: generates a small example PDF and saves it to a temporary file.
 class PdfDownloader {
   const PdfDownloader();
-
-  /// Smart method that ensures a PDF file path from [url].
-  /// - If content is a PDF, saves and returns it.
-  /// - If content is an image, embeds it into a single-page PDF and returns the PDF path.
-  /// Returns null if the download or conversion fails.
-  Future<String?> ensurePdfFromUrl(String url) async {
-    try {
-      final dio = Dio();
-      final response = await dio.get<List<int>>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-        ),
-      );
-
-      final headers = response.headers.map;
-      final contentType =
-          headers['content-type']?.join(',').toLowerCase() ?? '';
-      final bytes = response.data ?? <int>[];
-
-      // Decide by content-type first, fallback to URL extension.
-      final isPdf =
-          contentType.contains('application/pdf') || _looksLikePdfUrl(url);
-      final isImage =
-          contentType.startsWith('image/') || _looksLikeImageUrl(url);
-
-      if (isPdf) {
-        return _savePdfBytes(bytes, suggestedName: _fileNameFromUrl(url));
-      }
-      if (isImage) {
-        return _imageBytesToPdf(bytes, suggestedName: _fileNameFromUrl(url));
-      }
-
-      // Fallback strategy: try PDF first; if that fails to open later, caller will handle error.
-      return _savePdfBytes(bytes, suggestedName: _fileNameFromUrl(url));
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Legacy method: downloads the content and saves with .pdf extension (may fail for non-PDF).
-  Future<String?> downloadFromUrl(String url) async {
-    try {
-      final dir = await getTemporaryDirectory();
-      final fileName = _fileNameFromUrl(url);
-      final savePath = p.join(dir.path, fileName);
-
-      final dio = Dio();
-      await dio.download(
-        url,
-        savePath,
-        options:
-            Options(responseType: ResponseType.bytes, followRedirects: true),
-      );
-
-      final file = File(savePath);
-      if (await file.exists() && await file.length() > 0) {
-        return savePath;
-      }
-    } catch (_) {
-      // swallow and return null for robustness
-    }
-    return null;
-  }
 
   /// Generates a simple example PDF and returns its file path.
   Future<String?> downloadExample() async {
