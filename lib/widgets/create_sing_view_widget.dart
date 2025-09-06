@@ -4,19 +4,37 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_signaturepad/signaturepad.dart';
 
+/// A dialog widget for creating a handwritten signature using
+/// [SfSignaturePad] from the Syncfusion package.
+///
+/// Provides options to:
+/// - Cancel the signature creation.
+/// - Clear the signature pad.
+/// - Save and return the signature as a [ui.Image].
 class CreateSingViewWidget extends StatefulWidget {
+  /// Callback triggered when the user cancels the signature.
+  ///
+  /// Provides a string message ("cancel signature").
   final ValueChanged<String>? onCancelled;
+
+  /// The color of the signature stroke.
   final ui.Color signatureColor;
 
-  const CreateSingViewWidget(
-      {super.key, this.onCancelled, required this.signatureColor});
+  const CreateSingViewWidget({
+    super.key,
+    this.onCancelled,
+    required this.signatureColor,
+  });
 
   @override
   State<CreateSingViewWidget> createState() => _CreateSingViewWidgetState();
 }
 
 class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
+  /// Counter for the number of signatures created.
   int signatureCount = 1;
+
+  /// Key to access the state of the signature pad widget.
   final GlobalKey<SfSignaturePadState> _signatureKey =
       GlobalKey<SfSignaturePadState>();
 
@@ -45,10 +63,12 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              /// Header row with close button and title
               Row(
                 mainAxisSize: MainAxisSize.max,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  /// Close button
                   IconButton(
                     onPressed: () {
                       Navigator.pop(context);
@@ -62,6 +82,8 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                       padding: EdgeInsets.all(4),
                     ),
                   ),
+
+                  /// Dialog title
                   Text(
                     "Create Signature",
                     style: TextStyle(
@@ -70,10 +92,15 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                       color: Color(0xFF2A6BCC),
                     ),
                   ),
-                  SizedBox(width: 48), // For balance
+
+                  /// Spacer for symmetry
+                  SizedBox(width: 48),
                 ],
               ),
+
               SizedBox(height: 24),
+
+              /// Signature pad container
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -94,10 +121,14 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                   ),
                 ),
               ),
+
               SizedBox(height: 24),
+
+              /// Action buttons row: Cancel, Clear, Save
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  /// Cancel button
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
@@ -127,7 +158,10 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                       ),
                     ),
                   ),
+
                   SizedBox(width: 12),
+
+                  /// Clear button
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
@@ -156,15 +190,23 @@ class _CreateSingViewWidgetState extends State<CreateSingViewWidget> {
                       ),
                     ),
                   ),
+
                   SizedBox(width: 12),
+
+                  /// Save button
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
                         try {
                           final signaturePadKey = _signatureKey;
+
+                          // Export signature as an image
                           ui.Image image =
                               await signaturePadKey.currentState!.toImage();
+
                           if (!context.mounted) return;
+
+                          // Return the image and count
                           Navigator.pop(context, {
                             'image': image,
                             'count': signatureCount,

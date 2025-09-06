@@ -1,3 +1,7 @@
+/// A Flutter page for signing PDF documents with customizable signature placement and navigation.
+///
+/// This page allows users to view a PDF, add signatures, resize and move them, and save the signed document.
+/// It supports multiple signatures, page navigation, and various customization options for UI and behavior.
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -10,32 +14,84 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import 'helper/signature_utils.dart';
 
+/// A StatefulWidget for displaying and signing a PDF document.
 class SignDocumentPage extends StatefulWidget {
+  /// The PDF file to be signed.
   final File file;
+
+  /// Callback triggered when an error occurs.
   final ValueChanged<Exception>? onError;
+
+  /// Callback triggered when the document is successfully signed.
   final ValueChanged<File>? onSignedDocument;
+
+  /// Callback triggered when the signing process is cancelled.
   final ValueChanged<String>? onCancelled;
+
+  /// Callback triggered when a signature is created.
   final ValueChanged<ui.Image>? onSign;
+
+  /// Callback triggered when the page changes.
   final ValueChanged<int>? onPageChanged;
+
+  /// Callback triggered when signature placements change.
   final ValueChanged<List<SignaturePlacement>>? onPlacementsChanged;
+
+  /// Callback triggered when signature mode is toggled.
   final ValueChanged<bool>? onSignatureModeChanged;
+
+  /// Custom builder for the page indicator widget.
   final Widget Function(BuildContext, int, int)? pageIndicatorBuilder;
+
+  /// Custom builder for the loading indicator widget.
   final Widget Function(BuildContext)? loadingIndicatorBuilder;
+
+  /// Custom builder for the error widget.
   final Widget Function(BuildContext, Exception)? errorWidgetBuilder;
+
+  /// Text for the upload button.
   final String uploadButtonMessage;
+
+  /// Text for the next page button.
   final String nextButtonMessage;
+
+  /// Text for the previous page button.
   final String prevButtonMessage;
+
+  /// Text for the add signature button.
   final String addSignatureMessage;
+
+  /// Primary color for buttons and UI elements.
   final Color primaryColor;
+
+  /// Background color of the page.
   final Color backgroundColor;
+
+  /// Color of the signature.
   final Color signatureColor;
+
+  /// Minimum scale for signature resizing.
   final double minSignatureScale;
+
+  /// Maximum scale for signature resizing.
   final double maxSignatureScale;
+
+  /// Whether multiple signatures are allowed.
   final bool enableMultipleSignatures;
+
+  /// Whether signatures can be deleted.
   final bool enableSignatureDeletion;
+
+  /// Whether signatures can be resized.
   final bool enableSignatureResizing;
+
+  /// Whether signatures can be rotated.
   final bool enableSignatureRotation;
+
+  /// Whether page navigation controls are shown.
   final bool showPageNavigation;
+
+  /// Whether the signature count is displayed.
   final bool showSignatureCount;
 
   const SignDocumentPage({
@@ -72,30 +128,61 @@ class SignDocumentPage extends StatefulWidget {
   State<SignDocumentPage> createState() => _SignDocumentState();
 }
 
+/// The state class for [SignDocumentPage], managing the PDF viewer and signature interactions.
 class _SignDocumentState extends State<SignDocumentPage> {
+  /// Controller for the PDF viewer.
   PDFViewController? _pdfController;
+
+  /// Controller for handling transformations (zoom/pan) of the PDF view.
   final TransformationController _transformationController =
       TransformationController();
+
+  /// Current scale of the PDF view.
   double _currentScale = 1.0;
+
+  /// Path to the PDF file.
   String? _pdfPath;
+
+  /// The signature image.
   ui.Image? _signatureImage;
+
+  /// PNG bytes of the signature image.
   Uint8List? _signaturePng;
+
+  /// List of signature placements on the PDF.
   final List<SignaturePlacement> _placements = [];
+
+  /// Utility class for signature-related operations.
   final SignatureUtils _sigUtils = const SignatureUtils();
+
+  /// Size of the PDF viewer widget.
   Size _pdfViewSize = Size.zero;
+
+  /// Current page index of the PDF.
   int _currentPage = 0;
+
+  /// Total number of pages in the PDF.
   int _pageCount = 0;
 
+  /// Whether the PDF viewer is visible.
   bool _pdfVisible = true;
+
+  /// Unique key for the PDF viewer widget.
   Key _pdfKey = UniqueKey();
 
+  /// Whether a signature is being pinched (resized).
   bool _isPinchingSignature = false;
+
+  /// Initial scale when pinching a signature.
   double? _pinchInitialScale;
 
+  /// Page to restore after signature creation.
   int? _pageToRestore;
 
   @override
   void initState() {
+    super.initState();
+    // Initialize state variables
     _pdfVisible = false;
     _pdfController = null;
     _pdfKey = UniqueKey();
@@ -107,6 +194,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     _currentPage = 0;
     _pageCount = 0;
 
+    // Add listener to update scale when transformation changes
     _transformationController.addListener(() {
       final m = _transformationController.value;
       final newScale = m.getMaxScaleOnAxis();
@@ -116,7 +204,8 @@ class _SignDocumentState extends State<SignDocumentPage> {
         });
       }
     });
-    super.initState();
+
+    // Load PDF and signature dialog after frame
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await _loadInitialPdf();
@@ -139,14 +228,15 @@ class _SignDocumentState extends State<SignDocumentPage> {
     });
   }
 
+  /// Handles errors by invoking the error callback and updating the UI.
   void _handleError(Exception error) {
     widget.onError?.call(error);
     if (widget.errorWidgetBuilder != null) {
-      // Error widget would be shown in build method
       setState(() {});
     }
   }
 
+  /// Loads the initial PDF file.
   Future<void> _loadInitialPdf() async {
     try {
       if (mounted) {
@@ -163,6 +253,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     }
   }
 
+  /// Shows a dialog to create a signature and loads it onto the PDF.
   Future<void> _showPopupAndLoadSignature() async {
     widget.onSignatureModeChanged?.call(true);
     _pageToRestore = _currentPage;
@@ -241,6 +332,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     }
   }
 
+  /// Saves the PDF with embedded signatures.
   Future<void> _savePdfWithSignatures() async {
     if (_pdfPath == null || _signaturePng == null || _signatureImage == null) {
       _handleError(Exception('Cannot save: Missing PDF or signature data'));
@@ -325,6 +417,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     }
   }
 
+  /// Returns the indices of signatures on the current page.
   List<int> _indicesForCurrentPage() {
     final List<int> result = [];
     for (int i = 0; i < _placements.length; i++) {
@@ -333,6 +426,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     return result;
   }
 
+  /// Calculates the center of the PDF content for signature placement.
   Offset _getContentCenter() {
     final m = _transformationController.value;
     final s = m.getMaxScaleOnAxis();
@@ -345,6 +439,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     return Offset(contentCenterX, contentCenterY);
   }
 
+  /// Centers a signature placement on the current page.
   void _centerPlacement(SignaturePlacement p) {
     if (_signatureImage == null) return;
     final img = _signatureImage!;
@@ -355,6 +450,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     p.offsetDy = center.dy - h / 2.0;
   }
 
+  /// Adds a new signature placement on the current page.
   void _addPlacementForCurrentPage() {
     if (_signatureImage == null || !widget.enableMultipleSignatures) return;
     setState(() {
@@ -368,6 +464,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     });
   }
 
+  /// Removes a signature placement.
   void _removePlacement(SignaturePlacement placement) {
     if (!widget.enableSignatureDeletion) return;
     setState(() {
@@ -388,6 +485,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     super.dispose();
   }
 
+  /// Shows a loading dialog during PDF saving.
   void _showLoadingDialog() {
     showDialog(
       context: context,
@@ -430,12 +528,14 @@ class _SignDocumentState extends State<SignDocumentPage> {
     );
   }
 
+  /// Hides the loading dialog if present.
   void _hideLoadingDialogIfAny() {
     if (Navigator.of(context, rootNavigator: true).canPop()) {
       Navigator.of(context, rootNavigator: true).pop();
     }
   }
 
+  /// Builds the page indicator widget.
   Widget _buildPageIndicator() {
     if (widget.pageIndicatorBuilder != null) {
       return widget.pageIndicatorBuilder!(context, _currentPage, _pageCount);
@@ -457,6 +557,7 @@ class _SignDocumentState extends State<SignDocumentPage> {
     );
   }
 
+  /// Builds the loading indicator widget.
   Widget _buildLoadingIndicator() {
     if (widget.loadingIndicatorBuilder != null) {
       return widget.loadingIndicatorBuilder!(context);
@@ -889,12 +990,26 @@ class _SignDocumentState extends State<SignDocumentPage> {
   }
 }
 
+/// Mixin defining callbacks for signature-related events.
 mixin SignatureResult {
+  /// Called when the signature is successfully applied and saved.
   void onSignatureSucceed(File file);
+
+  /// Called when the signature process fails.
   void onSignatureFailed(Exception message);
+
+  /// Called when the signature process is cancelled.
   void onSignatureCancelled(String message);
+
+  /// Called when a signature is created.
   void onSign(ui.Image signature);
+
+  /// Called when the current page changes.
   void onPageChanged(int currentPage);
+
+  /// Called when signature placements change.
   void onPlacementsChanged(List<SignaturePlacement> placements);
+
+  /// Called when signature mode is toggled.
   void onSignatureModeChanged(bool isSignatureMode);
 }

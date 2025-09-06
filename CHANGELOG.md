@@ -1,3 +1,4 @@
-## 1.0.2
+## 1.0.3
 
-* remove unused dependencies
+* add documentation 
+* fix minor bugs

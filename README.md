@@ -26,7 +26,7 @@ Add `signdoc` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  signdoc: ^1.0.0
+  signdoc: ^latest_version
 ```
 
 Then run:
