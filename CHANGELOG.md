@@ -1,3 +1,3 @@
-## 1.0.4
+## 1.0.5
 
-* follow linter rules comments
+* update readme content

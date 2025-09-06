@@ -1,4 +1,5 @@
-# Signdoc
+# Signdoc                
+<a href="https://www.buymeacoffee.com/gharbiriady" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 A powerful Flutter package for adding digital signatures to PDF documents. Integrate signature functionality into your Flutter applications with a beautiful, customizable UI.
 
