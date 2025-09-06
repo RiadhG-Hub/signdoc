@@ -2,6 +2,8 @@
 ///
 /// This page allows users to view a PDF, add signatures, resize and move them, and save the signed document.
 /// It supports multiple signatures, page navigation, and various customization options for UI and behavior.
+library;
+
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;

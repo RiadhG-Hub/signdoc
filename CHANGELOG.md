@@ -1,4 +1,3 @@
-## 1.0.3
+## 1.0.4
 
-* add documentation 
-* fix minor bugs
+* follow linter rules comments
